@@ -7,7 +7,7 @@ import {
   useState
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../http/api'
+import { api, registerTokenRefreshed, setAccessToken } from '../http/api'
 
 type User = {
   id: string
@@ -17,7 +17,6 @@ type User = {
 type AuthState = {
   user: User | null
   accessToken: string | null
-  refreshToken: string | null
 }
 
 type AuthContextValue = {
@@ -33,7 +32,18 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(() => {
     const stored = localStorage.getItem('auth')
-    return stored ? JSON.parse(stored) : { user: null, accessToken: null, refreshToken: null }
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        return {
+          user: parsed.user ?? null,
+          accessToken: parsed.accessToken ?? null
+        }
+      } catch {
+        return { user: null, accessToken: null }
+      }
+    }
+    return { user: null, accessToken: null }
   })
 
   const navigate = useNavigate()
@@ -42,13 +52,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('auth', JSON.stringify(state))
   }, [state])
 
+  useEffect(() => {
+    setAccessToken(state.accessToken)
+  }, [state.accessToken])
+
+  useEffect(() => {
+    registerTokenRefreshed((token) => {
+      setState((prev) => ({ ...prev, accessToken: token }))
+    })
+  }, [])
+
   const login = useCallback(
     async ({ email, password }: { email: string; password: string }) => {
       const res = await api.post('/auth/login', { email, password })
       setState({
         user: { id: res.userId, role: res.role },
-        accessToken: res.accessToken,
-        refreshToken: res.refreshToken
+        accessToken: res.accessToken
       })
       navigate('/')
     },
@@ -56,12 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const logout = useCallback(async () => {
-    if (state.refreshToken) {
-      await api.post('/auth/logout', { refreshToken: state.refreshToken }).catch(() => {})
-    }
-    setState({ user: null, accessToken: null, refreshToken: null })
+    await api.post('/auth/logout', {}).catch(() => {})
+    setState({ user: null, accessToken: null })
     navigate('/login')
-  }, [state.refreshToken, navigate])
+  }, [navigate])
 
   const value = useMemo(
     () => ({

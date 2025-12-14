@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import rateLimit from 'express-rate-limit'
 import multer from 'multer'
 import { z } from 'zod'
 import { requireAuth } from '../middlewares/auth.js'
@@ -10,6 +11,22 @@ import { writeLog } from '../services/logService.js'
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
 const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de requêtes upload, réessayez plus tard.' }
+})
+
+const downloadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trop de téléchargements, réessayez plus tard.' }
+})
 
 const createSchema = z.object({
   body: z.object({
@@ -52,6 +69,7 @@ router.post('/', requireAuth, validate(createSchema), async (req, res) => {
 router.post(
   '/upload',
   requireAuth,
+  uploadLimiter,
   upload.single('file'),
   async (req, res) => {
     const file = req.file
@@ -183,7 +201,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   })
 })
 
-router.get('/:id/download', requireAuth, async (req, res) => {
+router.get('/:id/download', requireAuth, downloadLimiter, async (req, res) => {
   const doc = await Document.findById(req.params.id)
   if (!doc || doc.isDeleted) return res.status(404).json({ error: 'Document introuvable' })
   const isOwner = doc.ownerId.toString() === req.user!.id

@@ -12,7 +12,15 @@ const envSchema = z.object({
   CRYPTO_KEY: z
     .string()
     .length(64, 'CRYPTO_KEY doit être une clé hex de 32 octets (64 chars)'),
-  CLIENT_ORIGIN: z.string().url().optional()
+  CLIENT_ORIGIN: z
+    .string()
+    .min(1, 'CLIENT_ORIGIN requis (ex: http://localhost:5173)')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
+    )
 })
 
 export const env = envSchema.parse(process.env)

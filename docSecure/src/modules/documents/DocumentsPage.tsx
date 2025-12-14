@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../http/api'
 
@@ -18,18 +18,13 @@ export function DocumentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const authHeader = useMemo(() => {
-    if (!accessToken) return undefined
-    return { Authorization: `Bearer ${accessToken}` } as const
-  }, [accessToken])
-
   useEffect(() => {
     if (!accessToken) return
     api
-      .get('/documents', { headers: authHeader })
+      .get('/documents')
       .then((res) => setDocs(res))
       .catch((err) => setError(err.message))
-  }, [accessToken, authHeader])
+  }, [accessToken])
 
   const uploadFile = async () => {
     if (!file) {
@@ -41,8 +36,8 @@ export function DocumentsPage() {
     try {
       const form = new FormData()
       form.append('file', file)
-      await api.postForm('/documents/upload', form, { headers: authHeader })
-      const refreshed = await api.get('/documents', { headers: authHeader })
+      await api.postForm('/documents/upload', form)
+      const refreshed = await api.get('/documents')
       setDocs(refreshed)
       setFile(null)
     } catch (e: unknown) {
@@ -148,7 +143,7 @@ export function DocumentsPage() {
   async function downloadDoc(id: string) {
     setError(null)
     try {
-      const res = await api.get(`/documents/${id}/download`, { headers: authHeader })
+      const res = await api.get(`/documents/${id}/download`)
       triggerDownload(res.base64, res.mime, res.name)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erreur inconnue')
@@ -158,7 +153,7 @@ export function DocumentsPage() {
   async function previewDoc(id: string) {
     setError(null)
     try {
-      const res = await api.get(`/documents/${id}/download`, { headers: authHeader })
+      const res = await api.get(`/documents/${id}/download`)
       const blob = base64ToBlob(res.base64, res.mime || 'application/octet-stream')
       const url = URL.createObjectURL(blob)
       if (res.mime && res.mime.includes('pdf')) {
@@ -176,7 +171,7 @@ export function DocumentsPage() {
     setError(null)
     setBusyId(id)
     try {
-      await api.del(`/documents/${id}`, { headers: authHeader })
+      await api.del(`/documents/${id}`)
       setDocs((prev) => prev.filter((d) => d._id !== id))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erreur inconnue')

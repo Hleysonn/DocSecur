@@ -7,8 +7,18 @@ import { encrypt, hashEmail, hashPassword, verifyPassword, decrypt } from '../ut
 import { signAccess, signRefresh, verifyRefresh } from '../utils/tokens.js'
 import { writeLog } from '../services/logService.js'
 import { requireAuth } from '../middlewares/auth.js'
+import { env } from '../config/env.js'
 
 const router = Router()
+
+const REFRESH_COOKIE_NAME = 'refreshToken'
+const refreshCookieOptions = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  secure: env.NODE_ENV === 'production',
+  path: '/auth',
+  maxAge: 7 * 24 * 60 * 60 * 1000 // 7 jours
+}
 
 const registerSchema = z.object({
   body: z.object({
@@ -85,17 +95,13 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     userAgent: req.get('user-agent') ?? undefined
   })
 
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions)
   res.json({ accessToken, refreshToken, role: user.role, userId: user.id })
 })
 
-const refreshSchema = z.object({
-  body: z.object({
-    refreshToken: z.string().min(10)
-  })
-})
-
-router.post('/refresh', validate(refreshSchema), async (req, res) => {
-  const { refreshToken } = req.body
+router.post('/refresh', async (req, res) => {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
+  if (!refreshToken) return res.status(401).json({ error: 'Refresh manquant' })
   let payload
   try {
     payload = verifyRefresh(refreshToken)
@@ -120,18 +126,16 @@ router.post('/refresh', validate(refreshSchema), async (req, res) => {
   session.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   await session.save()
 
-  res.json({ accessToken, refreshToken: newRefresh })
+  res.cookie(REFRESH_COOKIE_NAME, newRefresh, refreshCookieOptions)
+  res.json({ accessToken })
 })
 
-const logoutSchema = z.object({
-  body: z.object({
-    refreshToken: z.string().min(10)
-  })
-})
-
-router.post('/logout', validate(logoutSchema), async (req, res) => {
-  const { refreshToken } = req.body
-  await Session.deleteMany({ tokenHash: hashEmail(refreshToken) })
+router.post('/logout', async (req, res) => {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
+  if (refreshToken) {
+    await Session.deleteMany({ tokenHash: hashEmail(refreshToken) })
+  }
+  res.clearCookie(REFRESH_COOKIE_NAME, { path: refreshCookieOptions.path })
   res.json({ ok: true })
 })
 
