@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { verifyAccess } from '../utils/tokens.js'
+import { verifyAccess, isAccessTokenRevoked } from '../utils/tokens.js'
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -13,8 +13,13 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!token) return res.status(401).json({ error: 'Non authentifié' })
   try {
     const payload = verifyAccess(token)
-    req.user = { id: payload.sub, role: payload.role }
-    next()
+    isAccessTokenRevoked(token).then((revoked) => {
+      if (revoked) {
+        return res.status(401).json({ error: 'Token révoqué' })
+      }
+      req.user = { id: payload.sub, role: payload.role }
+      next()
+    }).catch(() => res.status(401).json({ error: 'Token invalide' }))
   } catch {
     return res.status(401).json({ error: 'Token invalide' })
   }

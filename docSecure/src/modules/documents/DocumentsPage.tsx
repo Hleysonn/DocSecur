@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../http/api'
+import { sanitizeText } from '../ui/sanitize'
 
 type Doc = {
   _id: string
@@ -8,6 +9,8 @@ type Doc = {
   version: number
   ownerId: string
   createdAt?: string
+  canDelete?: boolean
+  canDownload?: boolean
 }
 
 export function DocumentsPage() {
@@ -56,7 +59,7 @@ export function DocumentsPage() {
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-400">{sanitizeText(error)}</p>}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {docs.map((doc) => (
@@ -95,20 +98,22 @@ export function DocumentsPage() {
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 onClick={() => downloadDoc(doc._id)}
-                className="rounded-lg border border-slate-700 px-3 py-1 text-sm text-slate-100 transition hover:border-slate-500 hover:bg-slate-800/60"
+                disabled={doc.canDownload === false}
+                className="rounded-lg border border-slate-700 px-3 py-1 text-sm text-slate-100 transition hover:border-slate-500 hover:bg-slate-800/60 disabled:opacity-60 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500"
               >
                 Télécharger
               </button>
               <button
                 onClick={() => previewDoc(doc._id)}
-                className="rounded-lg border border-blue-700 px-3 py-1 text-sm text-blue-100 transition hover:border-blue-500 hover:bg-blue-700/20"
+                disabled={doc.canDownload === false}
+                className="rounded-lg border border-blue-700 px-3 py-1 text-sm text-blue-100 transition hover:border-blue-500 hover:bg-blue-700/20 disabled:opacity-60 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500"
               >
                 Ouvrir
               </button>
               <button
                 onClick={() => deleteDoc(doc._id)}
-                disabled={busyId === doc._id}
-                className="rounded-lg border border-red-700 px-3 py-1 text-sm text-red-100 transition hover:border-red-500 hover:bg-red-900/20 disabled:opacity-60"
+                disabled={busyId === doc._id || doc.canDelete === false}
+                className="rounded-lg border border-red-700 px-3 py-1 text-sm text-red-100 transition hover:border-red-500 hover:bg-red-900/20 disabled:opacity-60 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500"
               >
                 Supprimer
               </button>

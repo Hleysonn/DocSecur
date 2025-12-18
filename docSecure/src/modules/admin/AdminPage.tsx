@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../http/api'
+import { sanitizeText } from '../ui/sanitize'
 
 type AdminUser = { _id: string; role: 'USER' | 'MANAGER' | 'ADMIN'; createdAt?: string }
 type AdminLog = { _id: string; action: string; resource: string; createdAt: string }
@@ -84,7 +85,7 @@ export function AdminPage() {
       </div>
 
       {loading && <p className="text-sm text-slate-300">Chargement...</p>}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-400">{sanitizeText(error)}</p>}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">

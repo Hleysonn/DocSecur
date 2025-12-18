@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middlewares/auth.js'
 import { validate } from '../middlewares/validate.js'
 import { Document } from '../models/Document.js'
+import { User } from '../models/User.js'
 import { decrypt, encrypt } from '../utils/crypto.js'
 import { writeLog } from '../services/logService.js'
 
@@ -107,19 +108,64 @@ router.post(
 )
 
 router.get('/', requireAuth, async (req, res) => {
+  const role = req.user!.role
+  if (role === 'ADMIN') {
+    const docs = await Document.find({ isDeleted: false })
+      .select('ownerId type version createdAt updatedAt')
+      .lean()
+    const withPermissions = docs.map((doc) => ({
+      ...doc,
+      canDelete: true,
+      canDownload: true
+    }))
+    return res.json(withPermissions)
+  }
+
+  if (role === 'MANAGER') {
+    const userIds = await User.find({ role: 'USER' }).select('_id')
+    const userIdStrings = userIds.map((u) => u._id.toString())
+    const docs = await Document.find({
+      isDeleted: false,
+      $or: [
+        { ownerId: req.user!.id },
+        { ownerId: { $in: userIdStrings } },
+        { allowedUsers: req.user!.id }
+      ]
+    })
+      .select('ownerId type version createdAt updatedAt')
+      .lean()
+    const withPermissions = docs.map((doc) => ({
+      ...doc,
+      canDelete: false, // managers n'ont jamais le droit de supprimer
+      canDownload: true
+    }))
+    return res.json(withPermissions)
+  }
+
   const docs = await Document.find({
     isDeleted: false,
     $or: [{ ownerId: req.user!.id }, { allowedUsers: req.user!.id }]
-  }).select('ownerId type version createdAt updatedAt')
-  res.json(docs)
+  })
+    .select('ownerId type version createdAt updatedAt')
+    .lean()
+  const withPermissions = docs.map((doc) => ({
+    ...doc,
+    canDelete: false, // un USER ne peut plus supprimer, même ses propres docs
+    canDownload: true
+  }))
+  res.json(withPermissions)
 })
 
 router.delete('/:id', requireAuth, async (req, res) => {
   const doc = await Document.findById(req.params.id)
   if (!doc || doc.isDeleted) return res.status(404).json({ error: 'Document introuvable' })
-  if (doc.ownerId.toString() !== req.user!.id) {
-    return res.status(403).json({ error: 'Non autorisé' })
-  }
+  const isAdmin = req.user!.role === 'ADMIN'
+  const isManager = req.user!.role === 'MANAGER'
+  const isUser = req.user!.role === 'USER'
+
+  // Seul un ADMIN peut supprimer désormais
+  if (!isAdmin) return res.status(403).json({ error: 'Non autorisé' })
+
   doc.isDeleted = true
   await doc.save()
   await writeLog({
@@ -187,7 +233,14 @@ router.get('/:id', requireAuth, async (req, res) => {
   if (!doc || doc.isDeleted) return res.status(404).json({ error: 'Document introuvable' })
   const isOwner = doc.ownerId.toString() === req.user!.id
   const isAllowed = doc.allowedUsers.map(String).includes(req.user!.id)
-  if (!isOwner && !isAllowed) return res.status(403).json({ error: 'Non autorisé' })
+  const isAdmin = req.user!.role === 'ADMIN'
+  let ownerRole: string | null = null
+  if (req.user!.role === 'MANAGER') {
+    const owner = await User.findById(doc.ownerId).select('role')
+    ownerRole = owner?.role ?? null
+  }
+  const managerCanSee = req.user!.role === 'MANAGER' && (isOwner || ownerRole === 'USER' || isAllowed)
+  if (!isOwner && !isAllowed && !isAdmin && !managerCanSee) return res.status(403).json({ error: 'Non autorisé' })
   res.json({
     id: doc.id,
     encryptedData: doc.encryptedData,
@@ -206,7 +259,14 @@ router.get('/:id/download', requireAuth, downloadLimiter, async (req, res) => {
   if (!doc || doc.isDeleted) return res.status(404).json({ error: 'Document introuvable' })
   const isOwner = doc.ownerId.toString() === req.user!.id
   const isAllowed = doc.allowedUsers.map(String).includes(req.user!.id)
-  if (!isOwner && !isAllowed) return res.status(403).json({ error: 'Non autorisé' })
+  const isAdmin = req.user!.role === 'ADMIN'
+  let ownerRole: string | null = null
+  if (req.user!.role === 'MANAGER') {
+    const owner = await User.findById(doc.ownerId).select('role')
+    ownerRole = owner?.role ?? null
+  }
+  const managerCanSee = req.user!.role === 'MANAGER' && (isOwner || ownerRole === 'USER' || isAllowed)
+  if (!isOwner && !isAllowed && !isAdmin && !managerCanSee) return res.status(403).json({ error: 'Non autorisé' })
 
   const base64 = decrypt({ content: doc.encryptedData, iv: doc.dataIv, tag: doc.dataTag })
   const filename = decrypt({ content: doc.nameEnc, iv: doc.nameIv, tag: doc.nameTag })

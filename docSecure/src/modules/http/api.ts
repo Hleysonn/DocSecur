@@ -2,6 +2,7 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
 
 let accessToken: string | null = null
 let onTokenRefreshed: ((token: string) => void) | null = null
+let csrfToken: string | null = null
 
 export function setAccessToken(token: string | null) {
   accessToken = token
@@ -9,6 +10,26 @@ export function setAccessToken(token: string | null) {
 
 export function registerTokenRefreshed(cb: (token: string) => void) {
   onTokenRefreshed = cb
+}
+
+async function fetchCsrfToken() {
+  const res = await fetch(`${API_URL}/auth/csrf`, {
+    method: 'GET',
+    credentials: 'include'
+  })
+  if (!res.ok) throw new Error('CSRF token manquant')
+  const data = await res.json()
+  csrfToken = data.csrfToken
+  return csrfToken
+}
+
+async function ensureCsrfToken() {
+  if (csrfToken) return csrfToken
+  try {
+    return await fetchCsrfToken()
+  } catch {
+    return null
+  }
 }
 
 async function refreshAccessToken() {
@@ -32,6 +53,12 @@ async function request(path: string, options: RequestInit = {}, retry = true) {
   const headers = new Headers(options.headers || {})
   if (accessToken) {
     headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+
+  const method = (options.method || 'GET').toString().toUpperCase()
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const token = await ensureCsrfToken()
+    if (token) headers.set('X-CSRF-Token', token)
   }
 
   const res = await fetch(`${API_URL}${path}`, {

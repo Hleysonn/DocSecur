@@ -4,7 +4,7 @@ import { validate } from '../middlewares/validate.js'
 import { User } from '../models/User.js'
 import { Session } from '../models/Session.js'
 import { encrypt, hashEmail, hashPassword, verifyPassword, decrypt } from '../utils/crypto.js'
-import { signAccess, signRefresh, verifyRefresh } from '../utils/tokens.js'
+import { signAccess, signRefresh, verifyRefresh, blacklistAccessToken, verifyAccess } from '../utils/tokens.js'
 import { writeLog } from '../services/logService.js'
 import { requireAuth } from '../middlewares/auth.js'
 import { env } from '../config/env.js'
@@ -99,6 +99,11 @@ router.post('/login', validate(loginSchema), async (req, res) => {
   res.json({ accessToken, refreshToken, role: user.role, userId: user.id })
 })
 
+router.get('/csrf', (req, res) => {
+  const token = (req as any).csrfToken?.()
+  res.json({ csrfToken: token })
+})
+
 router.post('/refresh', async (req, res) => {
   const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
   if (!refreshToken) return res.status(401).json({ error: 'Refresh manquant' })
@@ -131,9 +136,20 @@ router.post('/refresh', async (req, res) => {
 })
 
 router.post('/logout', async (req, res) => {
+  const authHeader = req.headers.authorization
+  const accessToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
   const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
   if (refreshToken) {
     await Session.deleteMany({ tokenHash: hashEmail(refreshToken) })
+  }
+  if (accessToken) {
+    try {
+      const decoded: any = verifyAccess(accessToken)
+      const expMs = decoded?.exp ? decoded.exp * 1000 : undefined
+      await blacklistAccessToken(accessToken, expMs)
+    } catch {
+      // ignore invalid token
+    }
   }
   res.clearCookie(REFRESH_COOKIE_NAME, { path: refreshCookieOptions.path })
   res.json({ ok: true })
