@@ -12,6 +12,7 @@ import { api, registerTokenRefreshed, setAccessToken } from '../http/api'
 type User = {
   id: string
   role: 'USER' | 'MANAGER' | 'ADMIN'
+  name?: string
 }
 
 type AuthState = {
@@ -66,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async ({ email, password }: { email: string; password: string }) => {
       const res = await api.post('/auth/login', { email, password })
       setState({
-        user: { id: res.userId, role: res.role },
+        user: { id: res.userId, role: res.role, name: res.name },
         accessToken: res.accessToken
       })
       navigate('/')

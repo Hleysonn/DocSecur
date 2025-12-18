@@ -45,7 +45,12 @@ export function NavBar() {
         </button>
         <div className="hidden sm:flex items-center gap-3 text-sm">
           <NavLinks visibleLinks={visibleLinks} pathname={pathname} />
-          <AuthButtons isAuthenticated={isAuthenticated} userRole={user?.role} logout={logout} />
+          <AuthButtons
+            isAuthenticated={isAuthenticated}
+            userRole={user?.role}
+            userName={user?.name}
+            logout={logout}
+          />
         </div>
       </div>
       {open && (
@@ -54,6 +59,7 @@ export function NavBar() {
           <AuthButtons
             isAuthenticated={isAuthenticated}
             userRole={user?.role}
+            userName={user?.name}
             logout={() => {
               logout()
               setOpen(false)
@@ -95,7 +101,7 @@ function NavLinks({
 function AuthButtons({
   isAuthenticated,
   userRole,
-  // userName,
+  userName,
   logout
 }: {
   isAuthenticated: boolean
@@ -107,7 +113,9 @@ function AuthButtons({
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 text-sm">
       {isAuthenticated && userRole ? (
         <>
-          <span className="rounded-md bg-slate-800 px-2 py-1 text-slate-200">{userRole}</span>
+          <span className="rounded-md bg-slate-800 px-2 py-1 text-slate-200">
+            {userName ?? 'Utilisateur'}
+          </span>
           <button
             onClick={logout}
             className="rounded-lg border border-slate-700 px-3 py-1 text-slate-100 hover:border-slate-500"

@@ -3,7 +3,12 @@ import { useAuth } from '../auth/AuthContext'
 import { api } from '../http/api'
 import { sanitizeText } from '../ui/sanitize'
 
-type AdminUser = { _id: string; role: 'USER' | 'MANAGER' | 'ADMIN'; createdAt?: string }
+type AdminUser = {
+  _id: string
+  name?: string
+  role: 'USER' | 'MANAGER' | 'ADMIN'
+  createdAt?: string
+}
 type AdminLog = { _id: string; action: string; resource: string; createdAt: string }
 
 export function AdminPage() {
@@ -100,7 +105,7 @@ export function AdminPage() {
                 className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2"
               >
                 <div>
-                  <p className="text-slate-100 break-all">{u._id}</p>
+                  <p className="text-slate-100 break-all">{u.name ?? u._id}</p>
                   <p className="text-xs text-slate-400">
                     Créé le {u.createdAt ? new Date(u.createdAt).toLocaleString() : 'N/A'}
                   </p>

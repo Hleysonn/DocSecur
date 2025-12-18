@@ -8,6 +8,7 @@ type Doc = {
   type: string
   version: number
   ownerId: string
+  ownerName?: string
   createdAt?: string
   canDelete?: boolean
   canDownload?: boolean
@@ -88,6 +89,9 @@ export function DocumentsPage() {
               <p className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
                 Type : {doc.type}
+              </p>
+              <p className="text-xs text-slate-400">
+                Uploadé par {doc.ownerName ?? doc.ownerId}
               </p>
               {doc.createdAt && (
                 <p className="text-xs text-slate-400">

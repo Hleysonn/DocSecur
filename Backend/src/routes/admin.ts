@@ -4,14 +4,23 @@ import { requireAuth, requireRole } from '../middlewares/auth.js'
 import { validate } from '../middlewares/validate.js'
 import { User } from '../models/User.js'
 import { Log } from '../models/Log.js'
+import { decrypt } from '../utils/crypto.js'
 
 const router = Router()
 
 router.use(requireAuth, requireRole(['ADMIN']))
 
 router.get('/users', async (_req, res) => {
-  const users = await User.find().select('role createdAt updatedAt')
-  res.json(users)
+  const users = await User.find().select('role createdAt updatedAt nameEnc nameIv nameTag')
+  const formatted = users.map((user) => ({
+    _id: user.id,
+    name: decrypt({ content: user.nameEnc, iv: user.nameIv, tag: user.nameTag }),
+    role: user.role,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
+  }))
+
+  res.json(formatted)
 })
 
 const roleSchema = z.object({

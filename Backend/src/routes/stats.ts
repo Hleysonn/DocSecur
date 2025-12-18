@@ -19,7 +19,7 @@ router.get('/overview', requireAuth, async (req, res) => {
         $or: [{ ownerId: userId }, { allowedUsers: userId }]
       }
 
-  const [docsCount, typesAgg, recentDocs, recentLogs, usersCount] = await Promise.all([
+  const [docsCount, typesAgg, recentDocs, usersCount, recentLogs] = await Promise.all([
     Document.countDocuments(docMatch),
     Document.aggregate([
       { $match: docMatch },
@@ -29,11 +29,13 @@ router.get('/overview', requireAuth, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(5)
       .select('type version createdAt'),
-    Log.find(isAdmin ? {} : { userId })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select('action resource createdAt'),
-    isAdmin ? User.countDocuments() : Promise.resolve(undefined)
+    isAdmin ? User.countDocuments() : Promise.resolve(undefined),
+    isAdmin
+      ? Log.find({})
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .select('action resource createdAt')
+      : Promise.resolve([])
   ])
 
   const lastUpload = recentDocs[0]?.createdAt ?? null

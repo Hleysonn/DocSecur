@@ -29,6 +29,27 @@ const downloadLimiter = rateLimit({
   message: { error: 'Trop de téléchargements, réessayez plus tard.' }
 })
 
+async function hydrateOwnerNames<T extends { ownerId: any }>(docs: T[]) {
+  const ownerIds = Array.from(new Set(docs.map((d) => d.ownerId.toString())))
+  if (ownerIds.length === 0) return docs.map((d) => ({ ...d, ownerId: d.ownerId.toString() }))
+
+  const owners = await User.find({ _id: { $in: ownerIds } })
+    .select('nameEnc nameIv nameTag')
+    .lean()
+  const nameMap = new Map(
+    owners.map((u) => [
+      u._id.toString(),
+      decrypt({ content: u.nameEnc, iv: u.nameIv, tag: u.nameTag })
+    ])
+  )
+
+  return docs.map((doc) => ({
+    ...doc,
+    ownerId: doc.ownerId.toString(),
+    ownerName: nameMap.get(doc.ownerId.toString())
+  }))
+}
+
 const createSchema = z.object({
   body: z.object({
     name: z.string().min(1),
@@ -118,7 +139,8 @@ router.get('/', requireAuth, async (req, res) => {
       canDelete: true,
       canDownload: true
     }))
-    return res.json(withPermissions)
+    const withNames = await hydrateOwnerNames(withPermissions)
+    return res.json(withNames)
   }
 
   if (role === 'MANAGER') {
@@ -139,7 +161,8 @@ router.get('/', requireAuth, async (req, res) => {
       canDelete: false, // managers n'ont jamais le droit de supprimer
       canDownload: true
     }))
-    return res.json(withPermissions)
+    const withNames = await hydrateOwnerNames(withPermissions)
+    return res.json(withNames)
   }
 
   const docs = await Document.find({
@@ -153,7 +176,8 @@ router.get('/', requireAuth, async (req, res) => {
     canDelete: false, // un USER ne peut plus supprimer, même ses propres docs
     canDownload: true
   }))
-  res.json(withPermissions)
+  const withNames = await hydrateOwnerNames(withPermissions)
+  res.json(withNames)
 })
 
 router.delete('/:id', requireAuth, async (req, res) => {

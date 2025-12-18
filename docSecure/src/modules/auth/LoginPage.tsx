@@ -22,7 +22,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10 sm:py-16">
+    <div className="min-h-screen flex items-center justify-center px-4 py-10 sm:py-6">
       <div className="flex flex-col items-center w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl shadow-blue-500/10">
         <h1 className="text-2xl font-semibold text-slate-50 uppercase">Connexion</h1>
         <p className="text-sm text-slate-300 mt-6 text-center">

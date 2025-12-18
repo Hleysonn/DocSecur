@@ -78,6 +78,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 
   const accessToken = signAccess(user.id, user.role)
   const refreshToken = signRefresh(user.id, user.role)
+  const name = decrypt({ content: user.nameEnc, iv: user.nameIv, tag: user.nameTag })
 
   await Session.create({
     userId: user.id,
@@ -96,7 +97,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
   })
 
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions)
-  res.json({ accessToken, refreshToken, role: user.role, userId: user.id })
+  res.json({ accessToken, refreshToken, role: user.role, userId: user.id, name })
 })
 
 router.get('/csrf', (req, res) => {

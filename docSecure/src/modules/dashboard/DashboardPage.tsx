@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { api } from '../http/api'
 
@@ -7,7 +7,7 @@ type StatResponse = {
   lastUpload: string | null
   types: Array<{ type: string; count: number }>
   recentDocs: Array<{ _id: string; type: string; version: number; createdAt: string }>
-  recentLogs: Array<{ _id: string; action: string; resource: string; createdAt: string }>
+  recentLogs?: Array<{ _id: string; action: string; resource: string; createdAt: string }>
   usersCount?: number
 }
 
@@ -16,22 +16,31 @@ export function DashboardPage() {
   const [stats, setStats] = useState<StatResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isAdmin = user?.role === 'ADMIN'
 
   const authHeader = useMemo(
-    () => (accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    () => (accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined),
     [accessToken]
   )
 
-  useEffect(() => {
+  const loadStats = useCallback(async () => {
     if (!accessToken) return
     setLoading(true)
     setError(null)
-    api
-      .get('/stats/overview', { headers: authHeader })
-      .then((res) => setStats(res))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+    try {
+      const res = await api.get('/stats/overview', { headers: authHeader })
+      setStats(res)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erreur inconnue')
+    } finally {
+      setLoading(false)
+    }
   }, [accessToken, authHeader])
+
+  useEffect(() => {
+    if (!accessToken) return
+    void loadStats()
+  }, [accessToken, loadStats])
 
   return (
     <div className="space-y-6">
@@ -75,28 +84,44 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-              <h2 className="text-lg font-semibold text-slate-50">Dernières activités</h2>
-              <div className="mt-3 space-y-2 text-sm text-slate-200">
-                {stats.recentLogs.length === 0 && (
-                  <p className="text-slate-400">Aucune activité récente</p>
-                )}
-                {stats.recentLogs.map((log) => (
-                  <div
-                    key={log._id}
-                    className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 px-3 py-2"
-                  >
-                    <div>
-                      <p className="text-slate-100">{log.action}</p>
-                      <p className="text-xs text-slate-400">{log.resource}</p>
+            {isAdmin ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <h2 className="text-lg font-semibold text-slate-50">Dernières activités</h2>
+                <div className="mt-3 space-y-2 text-sm text-slate-200">
+                  {(stats.recentLogs?.length ?? 0) === 0 && (
+                    <p className="text-slate-400">Aucune activité récente</p>
+                  )}
+                  {stats.recentLogs?.map((log) => (
+                    <div
+                      key={log._id}
+                      className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-slate-100">{log.action}</p>
+                        <p className="text-xs text-slate-400">{log.resource}</p>
+                      </div>
+                      <span className="text-xs text-slate-400">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </span>
                     </div>
-                    <span className="text-xs text-slate-400">
-                      {new Date(log.createdAt).toLocaleString()}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <h2 className="text-lg font-semibold text-slate-50">Vue rapide</h2>
+                <div className="mt-3 space-y-2 text-sm text-slate-200">
+                  {/* <p className="text-slate-300">
+                    Les journaux détaillés sont réservés aux administrateurs. Vous pouvez
+                    néanmoins consulter vos documents et vos partages ci-dessous.
+                  </p>
+                  <p className="text-slate-400">
+                    Astuce : utilisez l’onglet Documents pour prévisualiser ou télécharger vos
+                    fichiers, et l’onglet Profil pour mettre à jour votre nom ou mot de passe.
+                  </p> */}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
