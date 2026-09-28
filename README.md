@@ -14,7 +14,7 @@ Application fullstack pour la gestion sécurisée de documents.
    - `JWT_ACCESS_SECRET` (32+ chars)
    - `JWT_REFRESH_SECRET` (32+ chars)
    - `CRYPTO_KEY` (clé hex 64 chars, 32 octets)
-   - `CLIENT_ORIGIN` (origines autorisées, séparées par virgule, ex : `http://localhost:5173`)
+   - `CLIENT_ORIGIN` (origines autorisées, séparées par virgule, ex : `http://localhost:XXXX)
    - `PORT` (par défaut 4000)
 5. `pnpm dev`
 
@@ -24,7 +24,7 @@ Endpoints principaux : `/auth`, `/documents`, `/admin`, `/health`, `/stats`.
 
 1. `cd docSecure`
 2. `pnpm install`
-3. Ajoutez `VITE_API_URL` dans un fichier `.env.local` (par ex. `http://localhost:4000`)
+3. Ajoutez `VITE_API_URL` dans un fichier `.env.local` (par ex. `http://localhost:XXXX`)
 4. `pnpm dev`
 
 ### Client HTTP & rafraîchissement
